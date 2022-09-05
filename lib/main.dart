@@ -1,55 +1,76 @@
+import 'package:fluro/fluro.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:newwave_health/repositories/healthcare_repository.dart';
+import 'package:newwave_health/ui/home/home_cubit.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'configs/app_config.dart';
+import 'router/application.dart';
+import 'router/routes.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
+      .then((_) {
+    runApp(new MyApp());
+  });
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key key}) : super(key: key);
+class MyApp extends StatefulWidget {
+  MyApp() {
+    final router = FluroRouter();
+    Routes.configureRoutes(router);
+    Application.router = router;
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'Newwave Health'),
-    );
+  State<StatefulWidget> createState() {
+    return _MyAppState();
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key key, this.title}) : super(key: key);
-  final String title;
+class _MyAppState extends State<MyApp> {
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
+  void initState() {
+    super.initState();
+  }
 
-class _MyHomePageState extends State<MyHomePage> {
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
+    return MultiRepositoryProvider(
+      providers: [
+        RepositoryProvider<HealthcareRepository>(create: (context) {
+          return HealthcareRepositoryImpl();
+        }),
+      ],
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<HomeCubit>(create: (context) {
+            return HomeCubit();
+          }),
+        ],
+        child: materialApp(),
       ),
-      body: Center(
-        child: InkWell(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-            decoration: const BoxDecoration(
-              color: Colors.blue,
-              borderRadius: BorderRadius.all(Radius.circular(15)),
-            ),
-            child: const Text(
-              "Sync Health data",
-              style: TextStyle(color: Colors.white, fontSize: 20),
-            ),
-          ),
-          onTap: () {},
-        ),
-      ),
+    );
+  }
+
+  MaterialApp materialApp() {
+    return MaterialApp(
+      title: AppConfig.appName,
+      debugShowCheckedModeBanner: false,
+      // theme: AppThemes.theme,
+      onGenerateRoute: Application.router.generator,
+      initialRoute: Routes.root,
+      navigatorKey: navigatorKey,
     );
   }
 }
