@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:health/health.dart';
+import 'package:newwave_health/global_data/global_event.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:rxdart/subjects.dart';
 
 part 'home_state.dart';
@@ -12,8 +16,8 @@ class HomeCubit extends Cubit<HomeState> {
   HealthFactory health = HealthFactory();
 
   List<HealthDataType> _healthDataTypes = [
-    HealthDataType.BASAL_ENERGY_BURNED,
-    HealthDataType.STEPS,
+    // HealthDataType.BASAL_ENERGY_BURNED,
+    // HealthDataType.STEPS,
     HealthDataType.HEIGHT,
     HealthDataType.WEIGHT,
     HealthDataType.BODY_FAT_PERCENTAGE,
@@ -32,6 +36,60 @@ class HomeCubit extends Cubit<HomeState> {
   }
 
   Future<void> getHealthCareData() async {
+    /// Xin cap quyen access Physical activity -> Lay data step tu Google Fit
+    if (Platform.isAndroid) {
+      try {
+        var _permissionActivityRecognition =
+            await Permission.activityRecognition.status;
+        if (_permissionActivityRecognition != PermissionStatus.granted) {
+          final permissionStatus =
+              await Permission.activityRecognition.request();
+          if (permissionStatus != PermissionStatus.granted) {
+            requestActivityRecognitionPermissionController.sink.add(true);
+            // emit(state.copyWith(syncHealthDataStatus: LoadStatus.FAILURE));
+            return;
+          }
+        }
+      } catch (error) {
+        // logger.e("$tag - onChangeAsyncDevice(): " + error.toString());
+      }
+    }
+
+    /// Request Google authorization
+    bool requested = await health.requestAuthorization(_healthDataTypes);
+    if (requested != null && requested) {
+      DateTime dateTime = DateTime.now();
+      print('Approve request');
+
+      /// Dong bo health data trong ngay
+      var currentTimeOfDate = dateTime;
+      var startTimeOfDate =
+          DateTime(dateTime.year, dateTime.month, dateTime.day);
+      List<HealthDataPoint> healthDataOneDay =
+          await health.getHealthDataFromTypes(
+        startTimeOfDate,
+        currentTimeOfDate,
+        _healthDataTypes,
+      );
+      print(healthDataOneDay);
+
+      /// Gui health data len foodcoach server
+      if (healthDataOneDay.length == 0) {
+        // Khong co health data
+        print('Health Data is Empty');
+        // emit(state.copyWith(syncStateEnum: SyncStateEnum.ERROR_OR_NO_DATA));
+      } else {
+        var temporaryDate = healthDataOneDay[0].dateFrom;
+        // await addHealthDataToServer(
+        //   date: DateFormat(AppConfig.dateFormat).format(temporaryDate),
+        //   healthData: healthDataOneDay,
+        // );
+        /// Da dong bo thanh cong
+        GlobalEvent.instance.reloadCalendarController.sink.add(true);
+        GlobalEvent.instance.reloadHomePageController.sink.add(true);
+      }
+    }
+
     // final preference = await Preferences.getInstance();
     // final isAsync = preference.getCollectedDevice() ?? false;
     // bool collected = false;
